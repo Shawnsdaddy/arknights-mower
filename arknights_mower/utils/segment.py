@@ -286,9 +286,10 @@ def read_screen(img,type="number",langurage="eng",limit =24,cord=None,draw=False
         except Exception as e:
             # 空的时候是没人在基建
             if data in ocr_error.keys() : ocr_error[data]
-            elif not data=='': return -1
+            elif not data=='':
+                logger.warning("读取结果有误:-->" + data)
+                return -1
             else :
-                logger.warning("读取结果有误:-->"+data)
                 return data
 def worker_with_mood(img: tp.Image,mood_only=False,length=5, draw: bool = False) -> tuple[
     list[ tp.Rectangle ], tp.Rectangle, bool ]:
@@ -296,15 +297,16 @@ def worker_with_mood(img: tp.Image,mood_only=False,length=5, draw: bool = False)
     进驻总览的图像分割算法
     """
     try:
-        result = [{},{},{},{},{}]
+        result = []
         index = 0
         x0 = 620;y0 = 1005;x1 = 677;y1 = 1300;h = int((y1 - y0) / 5)
         a0 = 80; b0 = 1005; a1 = 275; b1 = 1305; ah = int((b1 - b0) / 5)
         while index < length:
-            result[index]["mood"]=read_screen(img[ (y0+h*index):(y0+h*(index+1)), x0:x1 ])
+            data ={}
+            data ["mood"]=read_screen(img[ (y0+h*index):(y0+h*(index+1)), x0:x1 ])
             if not mood_only:
                 #如果不是没人在基建
-                if result[index]["mood"]!='':
+                if data["mood"]!='':
                     ocr = ocrhandle.predict(img[ (b0 + ah * index):(b0 + ah * (index + 1)), a0:a1 ])
                     if len(ocr) > 0 :name = ocr[ 0 ][ 1 ]
                     else:
@@ -312,12 +314,12 @@ def worker_with_mood(img: tp.Image,mood_only=False,length=5, draw: bool = False)
                                                langurage="chi_sim",
                                                type="text")
                     if name in ocr_error.keys():
-                        result[ index ][ "agent" ] = ocr_error[ name ]
+                        data[ "agent" ] = ocr_error[ name ]
                     elif name == '' and draw:
                         plt.imsahow(img[ (b0 + ah * index):(b0 + ah * (index + 1)), a0:a1 ])
                     else:
-                        result[ index ][ "agent" ] = name
-                else :result[ index ][ "agent" ] = ''
+                        data[ "agent" ] = name
+            result.append(data)
             index = index + 1
         return result
     except Exception as e:

@@ -91,8 +91,11 @@ class BaseSchedulerSolver(BaseSolver):
             self.back()
             return
         if self.task is not None:
-            self.agent_arrange(self.task[ "plan" ])
-            del self.tasks[ 0 ]
+            try:
+                self.agent_arrange(self.task["plan"])
+                del self.tasks[0]
+            except Exception as e:
+                logger.exception("error")
             self.task = None
         elif not self.todo_task:
             # 处理基建 Todo
@@ -105,8 +108,11 @@ class BaseSchedulerSolver(BaseSolver):
             else:
                 self.todo_task = True
         elif not self.planned:
-            self.agent_get_mood()
-            self.plan_solver()
+            try:
+                self.agent_get_mood()
+                self.plan_solver()
+            except Exception as e:
+                logger.exception("error")
             self.planned = True
         else:
             if len(self.tasks) > 0:
@@ -140,6 +146,7 @@ class BaseSchedulerSolver(BaseSolver):
         total_agent = [ ]
         error_agent = [ ]
         # 准备数据
+        logger.info(current_base)
         for key in current_base:
             if (key == 'train' or key == 'factory'): continue
             for idx, operator in enumerate(current_base[ key ]):
@@ -214,10 +221,10 @@ class BaseSchedulerSolver(BaseSolver):
         #         # 硬编了4 应该从free里代替
         #         output_plan[ "dormitory_" + str(idx + 1) ][ 4 ] = agent[ "agent" ];
         #     print(output_plan)
-        if self.check_fia() is not None:
-            if not any(room in obj["plan"].keys() and len(obj["plan"][room]) == 2 for obj in self.tasks):
-                fia_plan,fia_room = self.check_fia()
-                if next(obj for obj in total_agent if obj["agent"] == '菲亚梅塔')["mood"] == 24:
+        fia_plan, fia_room = self.check_fia()
+        if fia_room is not None and fia_plan is not None:
+            if not any(fia_room in obj["plan"].keys() and len(obj["plan"][room]) == 2 for obj in self.tasks):
+                if next(obj for obj in total_agent if obj["agent"] == '菲亚梅塔')["mood"] ==24:
                     change_time = datetime.now()
                 else : change_time = self.get_time(fia_room,'菲亚梅塔')
                 logger.info('下一次进行菲亚梅塔充能：' + change_time.strftime("%H:%M:%S"))
@@ -251,7 +258,7 @@ class BaseSchedulerSolver(BaseSolver):
             if not x.startswith('dormitory'): continue
             if any('菲亚梅塔' == obj[ 'agent' ]  for obj in y):
                 return next((obj for obj in y if obj["agent"] == '菲亚梅塔'), None),x
-        return None
+        return None,None
 
     def get_time(self,room,name,adjustment=0):
         self.enter_room(room)
