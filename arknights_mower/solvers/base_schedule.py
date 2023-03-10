@@ -271,7 +271,7 @@ class BaseSchedulerSolver(BaseSolver):
                     continue
             self.back()
         if '' in self.operators.keys(): self.operators['']['current_room'] = ''
-        logger.info(self.operators)
+        logger.debug(self.operators)
         for room in self.currentPlan.keys():
             for idx, item in enumerate(self.currentPlan[room]):
                 _name = next((k for k, v in self.operators.items() if
@@ -384,7 +384,7 @@ class BaseSchedulerSolver(BaseSolver):
             # 根据剩余心情排序
             self.total_agent.sort(key=lambda x: x["mood"], reverse=False)
             # 目前有换班的计划后面改
-            logger.info(f'当前基地数据--> {self.total_agent}')
+            logger.debug(f'当前基地数据--> {self.total_agent}')
             exclude_list = []
             fia_plan, fia_room = self.check_fia()
             if fia_room is not None and fia_plan is not None:
@@ -725,9 +725,11 @@ class BaseSchedulerSolver(BaseSolver):
         self.back(interval=2)
         return execute_time
 
-    def double_read_time(self, cord,upperLimit = 9000):
+    def double_read_time(self, cord, upperLimit=36000, error_count=0,):
+        if upperLimit < 36000:
+            upperLimit = 36000
         self.recog.update()
-        time_in_seconds = self.read_time(cord,upperLimit)
+        time_in_seconds = self.read_time(cord, upperLimit)
         execute_time = datetime.now() + timedelta(seconds=(time_in_seconds))
         return execute_time
 
@@ -736,7 +738,7 @@ class BaseSchedulerSolver(BaseSolver):
         global ocr
         if ocr is None:
             ocr = PaddleOCR(use_angle_cls=True, lang='en')
-
+            
     def read_screen(self,img, type="mood",limit=24, cord=None, change_color=False):
         if cord is not None:
             img = img[cord[1]:cord[3], cord[0]:cord[2]]
@@ -772,14 +774,14 @@ class BaseSchedulerSolver(BaseSolver):
         except Exception as e :
             logger.exception(e)
             return limit
-
-    def read_time(self, cord,upperlimit, error_count=0):
+            
+    def read_time(self, cord, upperlimit, error_count=0):
         # 刷新图片
         self.recog.update()
-        time_str = self.read_screen(self.recog.img, type='time', cord=cord)
-        logger.debug(time_str)
+        time_str = segment.read_screen(self.recog.img, type='time', cord=cord)
+        logger.debug(str(time_str))
         try:
-            h, m, s = time_str.split(':')
+            h, m, s = str(time_str).split(':')
             if int(m)>60 or int(s)>60:
                 raise Exception(f"读取错误")
             res =  int(h) * 3600 + int(m) * 60 + int(s)
@@ -787,7 +789,7 @@ class BaseSchedulerSolver(BaseSolver):
                 raise Exception(f"超过读取上限")
             else :return res
         except:
-            logger.error("读取失败" + "--> " + time_str)
+            logger.error("读取失败" + "--> " + str(time_str))
             if error_count > 50:
                 raise Exception(f"读取失败{error_count}次超过上限")
             else:
@@ -1470,6 +1472,7 @@ class BaseSchedulerSolver(BaseSolver):
                     current = self.get_agent_from_room(room, time_index)
                     for idx, name in enumerate(plan[room]):
                         if current[idx]['agent'] != name:
+                            logger.error(f'检测到的干员{current[idx]["agent"]},需要安排的干员{name}')
                             raise Exception('检测到安排干员未成功')
                     #  如果不匹配，则退出主界面再重新进房间一次
                     if room in read_time_room:
@@ -1582,7 +1585,11 @@ class BaseSchedulerSolver(BaseSolver):
                     'select': [4],
                     'confirm': [3, 4],
                     'times': 4,
-                    'refresh': True
+                    'refresh': True,
+                    "recruitment_time": {
+                        "3": 460,
+                        "4": 540
+                    }
                 })
                 self.MAA.append_task('Visit')
                 self.MAA.append_task('Mall', {
@@ -1653,7 +1660,7 @@ class BaseSchedulerSolver(BaseSolver):
                     self.device.exit('com.hypergryph.arknights')
             # 生息演算逻辑 结束
             remaining_time = (self.tasks[0]["time"] - datetime.now()).total_seconds()
-            logger.info(f"开始休息 {remaining_time} 秒")
+            logger.info(f"开始休息 {'%.2f' % (remaining_time/60)} 分钟，到{self.tasks[0]['time'].strftime('%H:%M:%S')}")
             self.send_email("脚本停止")
             time.sleep(remaining_time)
             self.MAA = None
@@ -1662,11 +1669,12 @@ class BaseSchedulerSolver(BaseSolver):
             self.MAA = None
             remaining_time = (self.tasks[0]["time"] - datetime.now()).total_seconds()
             if remaining_time > 0:
-                logger.info(f"开始休息 {remaining_time} 秒")
+                logger.info(f"开始休息 {'%.2f' % (remaining_time/60)} 分钟，到{self.tasks[0]['time'].strftime('%H:%M:%S')}")
                 time.sleep(remaining_time)
             self.device.exit('com.hypergryph.arknights')
 
     def send_email(self, tasks):
+        return
         try:
             msg = MIMEMultipart()
             conntent = str(tasks)
